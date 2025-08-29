@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>เกมคำต้องเชื่อม — เล่นเองในรงเรียน</title>
+  <meta name="theme-color" content="#0ea5e9">
+  <style>
+    :root{--bg1:#74ebd5;--bg2:#ACB6E5;--card:#ffffff;--text:#1f2937;--muted:#6b7280;--primary:#0ea5e9;--danger:#ef4444}
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:"Prompt",system-ui,Arial;background:linear-gradient(135deg,var(--bg1),var(--bg2));color:var(--text)}
+    .container{max-width:980px;margin:18px auto;padding:16px}
+    .title{font-size:28px;color:#fff;text-align:center;margin-bottom:6px}
+    .subtitle{color:#e5f6ff;text-align:center;margin-bottom:12px}
+    .card{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .center{justify-content:center}
+    .btn{border:0;padding:10px 14px;border-radius:12px;cursor:pointer;background:var(--primary);color:#fff;font-weight:700}
+    .btn.ghost{background:#111827}
+    .btn.warn{background:#f59e0b}
+    .info-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
+    .info-box{background:#fff;border-radius:10px;padding:8px;text-align:center}
+    .words{max-height:40vh;overflow:auto;margin:10px 0;padding:8px;border-radius:10px;background:#fff}
+    .word-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px;border-bottom:1px solid #eef2f7}
+    input[type=text]{padding:10px;border-radius:10px;border:2px solid #e5e7eb;width:100%}
+    .popup{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
+    .popup.active{display:flex}
+    .popup .content{background:#fff;padding:14px;border-radius:12px;width:320px}
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;background:#111827;color:#fff;padding:10px 14px;border-radius:12px;display:none}
+    /* Vote overlay full screen */
+    .vote-overlay{position:fixed;inset:0;background:linear-gradient(180deg,rgba(2,6,23,0.9),rgba(0,0,0,0.7));display:none;align-items:center;justify-content:center;z-index:9999;padding:18px}
+    .vote-card{background:linear-gradient(180deg,#0ea5e9,#0284c7);border-radius:16px;padding:20px;width:100%;max-width:720px;color:white;text-align:center;box-shadow:0 30px 80px rgba(2,6,23,0.6)}
+    .vote-words{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+    .vote-words input{padding:12px;border-radius:10px;border:0;width:42%;font-size:18px;text-align:center}
+    .vote-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+    .vote-btn{padding:22px 12px;border-radius:12px;font-size:26px;font-weight:800;border:0;cursor:pointer;box-shadow:0 12px 30px rgba(0,0,0,0.25)}
+    .vote-btn.yes{background:linear-gradient(180deg,#34d399,#10b981);color:white}
+    .vote-btn.no{background:linear-gradient(180deg,#ff7a7a,#ef4444);color:white}
+    .vote-stats{display:flex;gap:20px;justify-content:center;margin-top:14px;font-size:20px}
+    .vote-stat{background:rgba(255,255,255,0.08);padding:10px 16px;border-radius:10px}
+    .close-vote{margin-top:14px;background:rgba(255,255,255,0.12);border-radius:10px;padding:8px 12px;color:white;border:0;cursor:pointer}
+    /* small helper */
+    .muted{color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title" style="color:rgb(255, 255, 255); 
+    text-shadow: 3px 3px 5px black;">
+  เกมคำต้องเชื่อม — สร้างโดยแมนยู
+</h1>
+
+<div class="subtitle" style="color:rgb(15, 96, 172); 
+    text-shadow: 2px 2px 4px gray;">
+  พิมพ์คำ เล่นสลับตา ● ถ้าต้องการโหวตว่าคำเชื่อมกันหรือไม่ ให้ใช้หน้าจอโหวต
+</div>
+
+    <!-- HOME -->
+    <section id="home" class="card">
+      <div class="row" id="playerList"></div>
+      <div class="row center" style="margin-top:10px">
+        <button class="btn" id="addPlayer">➕ เพิ่มผู้เล่น</button>
+        <button class="btn" id="startGame">▶️ เริ่มเกม</button>
+        <button class="btn ghost" id="restartGame">🔁 เริ่มเกมใหม่</button>
+      </div>
+    </section>
+
+    <!-- GAME -->
+    <section id="game" class="card" style="margin-top:12px;display:none">
+      <div class="info-bar">
+        <div class="info-box"><div>ผู้เล่นปัจจุบัน</div><div id="current">—</div></div>
+        <div class="info-box"><div>เวลาถอยหลัง (วิ)</div><div id="countdown">10</div></div>
+        <div class="info-box"><div>เวลาที่ผ่านไป</div><div id="elapsed">00:00</div></div>
+      </div>
+
+      <div class="words" id="words"></div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="wordInput" type="text" placeholder="พิมพ์คำ... (กด Enter หรือปุ่มตกลง)" />
+        <button class="btn" id="submit">ตกลง</button>
+        <button class="btn warn" id="togglePause">หยุด/เล่นต่อ</button>
+        <button class="btn ghost" id="openVoteManual">โหวตคำ (มือ)</button>
+      </div>
+
+      <div style="margin-top:8px;color:#6b7280;font-size:13px">หมายเหตุ: ถ้าต้องการ POS/คำกริยาที่แม่นยำ ให้ตั้งค่า POS_API_ENDPOINT ในโค้ด (ดึงคำกริยาจากเซิร์ฟเวอร์)</div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section id="summary" class="card" style="margin-top:12px;display:none">
+      <h3>สรุปผล</h3>
+      <div>เวลาทั้งหมด: <span id="finalTime">00:00</span></div>
+      <div>จำนวนคำ: <span id="finalWords">0</span></div>
+      <div>ผู้ชนะ: <span id="finalWinner">—</span></div>
+      <div style="margin-top:10px"><button class="btn" id="backHome">กลับหน้าหลัก</button></div>
+    </section>
+
+  </div>
+
+  <div class="popup" id="popup">
+    <div class="content">
+      <h4>เพิ่มผู้เล่น</h4>
+      <input id="playerName" type="text" placeholder="ชื่อผู้เล่น" />
+      <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+        <button class="btn" id="savePlayer">บันทึก</button>
+        <button class="btn ghost" id="closePopup">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- Vote overlay -->
+  <div class="vote-overlay" id="voteOverlay" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="vote-card">
+      <h2 style="margin:0 0 8px 0">โหวตว่าเชื่อมกันหรือไม่?</h2>
+      <div class="vote-words">
+        <input id="voteWord1" placeholder="คำที่ 1">
+        <input id="voteWord2" placeholder="คำที่ 2">
+      </div>
+      <div class="vote-buttons">
+        <button class="vote-btn yes" id="voteYesBtn">✅ เชื่อม</button>
+        <button class="vote-btn no" id="voteNoBtn">❌ ไม่เชื่อม</button>
+      </div>
+      <div class="vote-stats" id="voteStats">
+        <div class="vote-stat">✅ เชื่อม: <span id="statYes">0</span></div>
+        <div class="vote-stat">❌ ไม่เชื่อม: <span id="statNo">0</span></div>
+      </div>
+      <button class="close-vote" id="closeVoteBtn">ปิด</button>
+      <div class="muted" style="margin-top:10px">กดปุ่มจะเพิ่มจำนวนทันที — เริ่มจาก 0 ทุกหน้าต่าง (local)</div>
+    </div>
+  </div>
+
+<script>
+/* =================== State =================== */
+const qs = s=>document.querySelector(s);
+let players = []; // {id,name}
+let words = [];   // [{text,by}]
+let currentIndex = 0;
+let TURN = 10;
+let countdown = TURN;
+let countdownTimer = null;
+let elapsed = 0; let elapsedTimer = null;
+let paused = false;
+
+// votes store: key = "wordA|wordB" (order-preserving), value = {yes: n, no: n}
+const votes = {};
+
+// POS / verb list (client-side set; can be populated from remote API)
+const commonVerbs = new Set(); // loaded from remote if configured
+
+/* ========== CONFIG: connect POS_API_ENDPOINT if you want server-side POS/verb-list ========== */
+/* Example: set POS_API_ENDPOINT to "https://your-server.example.com/verbs" which returns JSON array of verbs */
+const POS_API_ENDPOINT = ''; // <-- ถ้ามี ใส่ URL เพื่อโหลดคำกริยา/POS จากเซิร์ฟเวอร์
+const POS_API_KEY = '';      // <-- ใส่ถ้ามี (optional)
+
+/* =================== Helpers =================== */
+function toast(t){const el=qs('#toast');el.textContent=t;el.style.display='block';setTimeout(()=>el.style.display='none',1600);} 
+function renderPlayers(){const row=qs('#playerList');row.innerHTML='';players.forEach((p,i)=>{const div=document.createElement('div');div.textContent=p.name;div.style.padding='8px';div.style.background='#fff';div.style.borderRadius='8px';div.style.marginRight='8px';row.appendChild(div)});} 
+function renderWords(){const el=qs('#words');el.innerHTML='';words.forEach(w=>{const d=document.createElement('div');d.className='word-item';d.innerHTML=`<div><b>${w.by}</b>: ${w.text}</div>`;el.appendChild(d)});} 
+function switchToGame(){qs('#game').style.display='block';qs('#home').style.display='none';qs('#summary').style.display='none';}
+function switchToSummary(){qs('#summary').style.display='block';qs('#game').style.display='none';qs('#home').style.display='none';}
+function updateInfo(){qs('#current').textContent = players[currentIndex]?players[currentIndex].name:'—'; qs('#countdown').textContent = countdown; qs('#elapsed').textContent = formatTime(elapsed);} 
+function formatTime(s){const m=String(Math.floor(s/60)).padStart(2,'0');const ss=String(s%60).padStart(2,'0');return `${m}:${ss}`}
+
+/* =================== Duplicate check (exact + substring/root) =================== */
+function commonSubstring(a,b,minLen=2){
+  for(let len=minLen; len<=Math.min(a.length,b.length); len++){
+    for(let i=0;i+len<=a.length;i++){
+      const sub=a.substring(i,i+len);
+      if(b.indexOf(sub)!==-1) return sub;
+    }
+  }
+  return null;
+}
+function findDuplicateWithDetail(word){
+  for(const w of words){ if(w.text===word) return {type:'exact',with:w.text}; }
+  for(const w of words){ const sub = commonSubstring(word,w.text,2); if(sub) return {type:'root',with:w.text,substr:sub}; }
+  return null;
+}
+
+/* =================== Verb check (uses commonVerbs set) =================== */
+function isVerb(word){
+  if(commonVerbs.has(word)) return true;
+  // simple heuristic fallback (not reliable): many Thai verbs end with 'า','่','้' etc. We'll avoid rejecting on heuristic alone
+  return false;
+}
+
+/* =================== Timers & flow =================== */
+function startTurnTimer(){ clearInterval(countdownTimer); countdown = TURN; updateInfo(); countdownTimer = setInterval(()=>{
+  if(paused) return; countdown--; updateInfo(); if(countdown<=0){ clearInterval(countdownTimer); onTimeout(); }
+},1000); }
+
+function startElapsedTimer(){ clearInterval(elapsedTimer); elapsed=0; elapsedTimer=setInterval(()=>{ if(!paused) elapsed++; qs('#elapsed').textContent = formatTime(elapsed); },1000); }
+
+function onTimeout(){
+  toast('หมดเวลา — จบรอบนี้');
+  qs('#finalTime').textContent = formatTime(elapsed);
+  qs('#finalWords').textContent = String(words.length);
+  qs('#finalWinner').textContent = '—';
+  switchToSummary();
+}
+
+/* =================== Submit word (NO auto-chain check) =================== */
+function submitWord(){
+  const raw = qs('#wordInput').value.trim(); if(!raw){ toast('ยังไม่พิมพ์คำ'); return; }
+  // check verb
+  if(isVerb(raw)) { toast('คำนี้เป็นคำกริยา (จากรายการตรวจ) ใช้ไม่ได้'); return; }
+  // check duplicate
+  const dup = findDuplicateWithDetail(raw);
+  if(dup){ if(dup.type==='exact') toast(`คำซ้ำกับ ${dup.with}`); else toast(`คำซ้ำเชิงรากกับ ${dup.with} (เหมือน '${dup.substr}')`); return; }
+  // accept
+  const playerName = players[currentIndex] ? players[currentIndex].name : 'ผู้เล่น';
+  words.push({text:raw,by:playerName});
+  renderWords();
+  qs('#wordInput').value='';
+  // open vote modal automatically to let players decide relation between prev and this
+  if(words.length>=2){
+    const prev = words[words.length-2].text;
+    openVoteOverlay(prev, raw);
+  }
+  // move to next player
+  if(players.length>0){
+    currentIndex = (currentIndex+1) % players.length;
+  }
+  updateInfo();
+  startTurnTimer();
+}
+
+/* =================== Vote overlay logic (local votes per pair) =================== */
+function pairKey(a,b){ return `${a}|${b}`; }
+function openVoteOverlay(a,b){
+  qs('#voteOverlay').style.display='flex';
+  qs('#voteOverlay').setAttribute('aria-hidden','false');
+  qs('#voteWord1').value = a || '';
+  qs('#voteWord2').value = b || '';
+  // init stats for this key if missing
+  const key = pairKey(a||'', b||'');
+  if(!votes[key]) votes[key] = {yes:0,no:0};
+  qs('#statYes').textContent = votes[key].yes;
+  qs('#statNo').textContent = votes[key].no;
+}
+function closeVoteOverlay(){
+  qs('#voteOverlay').style.display='none';
+  qs('#voteOverlay').setAttribute('aria-hidden','true');
+}
+// manual open (user clicked openVoteManual)
+qs('#openVoteManual').onclick = ()=>{ openVoteOverlay('',''); };
+
+qs('#voteYesBtn').addEventListener('click', ()=>{
+  const a = qs('#voteWord1').value.trim();
+  const b = qs('#voteWord2').value.trim();
+  const key = pairKey(a,b);
+  if(!votes[key]) votes[key] = {yes:0,no:0};
+  votes[key].yes += 1;
+  qs('#statYes').textContent = votes[key].yes;
+});
+qs('#voteNoBtn').addEventListener('click', ()=>{
+  const a = qs('#voteWord1').value.trim();
+  const b = qs('#voteWord2').value.trim();
+  const key = pairKey(a,b);
+  if(!votes[key]) votes[key] = {yes:0,no:0};
+  votes[key].no += 1;
+  qs('#statNo').textContent = votes[key].no;
+});
+qs('#closeVoteBtn').addEventListener('click', ()=>{ closeVoteOverlay(); });
+
+/* =================== UI wiring =================== */
+qs('#addPlayer').onclick = ()=>{ qs('#popup').classList.add('active'); qs('#playerName').focus(); };
+qs('#closePopup').onclick = ()=>{ qs('#popup').classList.remove('active'); };
+qs('#savePlayer').onclick = ()=>{ const name=qs('#playerName').value.trim(); if(!name) return; players.push({id:Date.now()+Math.random(),name}); qs('#playerName').value=''; qs('#popup').classList.remove('active'); renderPlayers(); updateInfo(); persist(); };
+qs('#startGame').onclick = ()=>{ if(players.length===0){ toast('เพิ่มผู้เล่นก่อน'); return; } words=[]; renderWords(); currentIndex=0; switchToGame(); startTurnTimer(); startElapsedTimer(); updateInfo(); };
+qs('#submit').onclick = submitWord; qs('#wordInput').addEventListener('keydown',e=>{ if(e.key==='Enter') submitWord(); });
+/* toggle pause/play in same position */
+qs('#togglePause').onclick = ()=>{
+  paused = !paused;
+  if(paused){
+    qs('#togglePause').textContent = 'เล่นต่อ';
+    toast('หยุดเวลา');
+  } else {
+    qs('#togglePause').textContent = 'หยุด/เล่นต่อ';
+    toast('เล่นต่อ');
+  }
+};
+/* restart: clear everything */
+qs('#restartGame').onclick = ()=>{ if(!confirm('เริ่มเกมใหม่ จะล้างคำและรายชื่อผู้เล่นไหม?')) return; words=[]; players=[]; renderPlayers(); qs('#home').style.display='block'; qs('#game').style.display='none'; qs('#summary').style.display='none'; persist(); }
+qs('#backHome').onclick = ()=>{ qs('#home').style.display='block'; qs('#game').style.display='none'; qs('#summary').style.display='none'; };
+
+/* =================== POS API / load verb list if endpoint provided =================== */
+async function loadVerbListFromServer(){
+  if(!POS_API_ENDPOINT) return;
+  try{
+    const res = await fetch(POS_API_ENDPOINT, { method:'GET', headers: POS_API_KEY ? {'x-api-key': POS_API_KEY} : {} });
+    if(!res.ok) { console.warn('ไม่สามารถโหลดคำกริยาจากเซิร์ฟเวอร์ได้'); return; }
+    const list = await res.json(); // expecting array of strings
+    if(Array.isArray(list)){
+      list.forEach(w=>commonVerbs.add(w));
+      console.log('loaded verbs count=', commonVerbs.size);
+    }
+  }catch(e){ console.warn('error loading verbs', e); }
+}
+// try load immediately (if configured)
+loadVerbListFromServer();
+
+/* =================== Persistence (localStorage สำหรับ players) =================== */
+function persist(){ localStorage.setItem('wc_players_v2', JSON.stringify(players)); }
+function restore(){ const s=localStorage.getItem('wc_players_v2'); if(s){ try{ players=JSON.parse(s); renderPlayers(); updateInfo(); }catch(e){} } }
+window.addEventListener('beforeunload',persist); restore();
+
+</script>
+</body>
+</html>
